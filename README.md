@@ -34,6 +34,10 @@ make dev-up
 make smoke-local
 ```
 
+启动后首页：
+
+![Go Modular Starter running at localhost:8080](docs/assets/starter.png)
+
 停止 app 用 `Ctrl+C`，停止本地依赖用：
 
 ```bash
