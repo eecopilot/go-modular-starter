@@ -34,11 +34,14 @@ make dev-up
 make smoke-local
 ```
 
-启动后首页：
+<details>
+<summary><strong>启动后首页</strong></summary>
 
 ![Go Modular Starter running at localhost:8080](docs/assets/starter.png)
 
-停止 app 用 `Ctrl+C`，停止本地依赖用：
+</details>
+
+停止 app 用 `Ctrl+C`，停止本地 PostgreSQL 用：
 
 ```bash
 make dev-down
@@ -95,7 +98,8 @@ web/
 
 如果以后前端变成完整 SPA，可以加 `web/src` 和 Vite/React/Vue 等构建工具，仍然输出到 `web/dist`，继续由 Go 侧 `go:embed` 打包。
 
-## Userkit
+<details>
+<summary><strong>Userkit</strong></summary>
 
 默认 `USERKIT_ENABLED=false`，starter 不要求本地必须有数据库。
 
@@ -126,7 +130,10 @@ GET  /api/v1/permissions
 GET  /api/v1/protected/example
 ```
 
-## 示例业务模块
+</details>
+
+<details>
+<summary><strong>示例业务模块</strong></summary>
 
 `internal/modules/example` 是给业务模块开发用的参考实现：
 
@@ -154,13 +161,15 @@ curl http://localhost:8080/api/v1/protected/example \
 
 新增业务模块的详细步骤见 [docs/add-module.md](docs/add-module.md)。
 
+</details>
+
 ## Docker
 
 有两种 Docker 用法。
 
-### 只跑依赖
+### 只启动 PostgreSQL
 
-适合日常开发：应用用 `go run` 跑在本机，PostgreSQL 跑在 Docker。
+适合日常开发：数据库跑在 Docker，Go app 跑在本机。`make docker-up` 只启动 PostgreSQL；`make migrate-up` 会用一次性迁移容器执行 SQL，执行完就退出。
 
 ```bash
 make docker-up
