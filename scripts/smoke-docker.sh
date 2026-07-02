@@ -28,6 +28,9 @@ fi
 curl -fsS "${BASE_URL}/api/v1/me" \
   -H "Authorization: Bearer ${token}" | grep -q "${email}"
 
+curl -fsS "${BASE_URL}/api/v1/protected/example" \
+  -H "Authorization: Bearer ${token}" | grep -q "${email}"
+
 curl -fsS -X POST "${BASE_URL}/api/v1/examples" \
   -H 'Content-Type: application/json' \
   -d '{"name":"Smoke item","description":"Docker smoke test"}' | grep -q '"Smoke item"'

@@ -13,6 +13,7 @@
 - 环境变量配置和 `.env.example`。
 - 可选 `userkit` 集成，启用后提供 `/api/v1/auth/*`、`/api/v1/me`、用户管理和 RBAC 路由。
 - 示例业务模块 `/api/v1/examples`，演示模块化 CRUD 写法。
+- 受保护业务示例 `/api/v1/protected/example`，演示登录后读取当前用户。
 - `web/` 前端目录，当前用 `go:embed` 将 `web/dist` 静态资源嵌入 Go 二进制。
 - Dockerfile 和 Docker Compose，支持依赖容器化或完整 app + PostgreSQL 启动。
 
@@ -95,6 +96,7 @@ GET  /api/v1/me
 GET  /api/v1/users
 GET  /api/v1/roles
 GET  /api/v1/permissions
+GET  /api/v1/protected/example
 ```
 
 ## 示例业务模块
@@ -107,6 +109,21 @@ GET  /api/v1/permissions
 - CRUD 测试。
 
 真实业务可以复制这个模块结构，再替换为自己的 repository、service 和 handler。
+
+`internal/modules/protectedexample` 演示登录后访问业务接口：
+
+- 路由只在 `USERKIT_ENABLED=true` 时注册。
+- 通过 `auth.RequireUser` 校验 `Authorization: Bearer <token>`。
+- handler 通过 `auth.CurrentUser(r)` 读取当前用户，再用用户 ID 限定业务数据归属。
+
+示例：
+
+```bash
+TOKEN="login-or-register-response-token"
+
+curl http://localhost:8080/api/v1/protected/example \
+  -H "Authorization: Bearer ${TOKEN}"
+```
 
 ## Docker
 

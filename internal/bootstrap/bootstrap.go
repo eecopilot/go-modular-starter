@@ -11,6 +11,7 @@ import (
 	"github.com/eecopilot/go-modular-starter/internal/modules/auth"
 	"github.com/eecopilot/go-modular-starter/internal/modules/example"
 	"github.com/eecopilot/go-modular-starter/internal/modules/health"
+	"github.com/eecopilot/go-modular-starter/internal/modules/protectedexample"
 	platformpostgres "github.com/eecopilot/go-modular-starter/internal/platform/postgres"
 	"github.com/eecopilot/go-modular-starter/internal/webui"
 	"github.com/eecopilot/go-modular-starter/web"
@@ -48,7 +49,9 @@ func New(cfg config.Config, log *slog.Logger) (*app.App, error) {
 			_ = db.Close(context.Background())
 			return nil, err
 		}
-		auth.New(service).RegisterRoutes(mux)
+		authModule := auth.New(service)
+		authModule.RegisterRoutes(mux)
+		protectedexample.New(authModule.RequireUser).RegisterRoutes(mux)
 		log.Info("userkit module enabled", "prefix", auth.Prefix)
 	} else {
 		log.Info("userkit module disabled")

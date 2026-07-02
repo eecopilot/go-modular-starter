@@ -46,6 +46,7 @@
 - `userkit` 可选集成，启用后提供注册、登录、`/me`、用户管理和 RBAC 路由。
 - `userkit` 迁移 SQL 复制到 starter `migrations/`。
 - 示例业务模块 `/api/v1/examples`。
+- 受保护业务示例 `/api/v1/protected/example`，演示 Bearer Token 校验和当前用户读取。
 - Dockerfile 和完整 app + migration + PostgreSQL compose profile。
 - GitHub Actions CI：`go test ./...`、compose config、Docker build。
 
@@ -56,6 +57,7 @@
 - `make docker-app-up` 可以构建并启动完整栈。
 - Docker 环境下 `/healthz`、`/readyz`、`/version` 返回 200。
 - Docker 环境下 `userkit` 注册、登录、`/me` smoke test 通过。
+- Docker 环境下受保护业务示例 smoke test 通过。
 - Docker 环境下 example CRUD smoke test 通过。
 
 ## 目标目录结构
