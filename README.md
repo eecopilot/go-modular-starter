@@ -17,14 +17,37 @@
 - `web/` 前端目录，当前用 `go:embed` 将 `web/dist` 静态资源嵌入 Go 二进制。
 - Dockerfile 和 Docker Compose，支持依赖容器化或完整 app + PostgreSQL 启动。
 
-## 快速开始
+## 5 分钟跑起来
+
+```bash
+git clone https://github.com/eecopilot/go-modular-starter.git
+cd go-modular-starter
+cp .env.example .env
+make dev-up
+```
+
+`make dev-up` 会启动 PostgreSQL、执行迁移，并以前台方式启动 Go app。默认会启用 `userkit`，所以注册、登录和受保护业务接口都可以直接验证。
+
+另开一个终端执行：
+
+```bash
+make smoke-local
+```
+
+停止 app 用 `Ctrl+C`，停止本地依赖用：
+
+```bash
+make dev-down
+```
+
+如果只想跑不带数据库和用户模块的空服务：
 
 ```bash
 go test ./...
-go run ./cmd/api
+make dev
 ```
 
-验证：
+基础验证：
 
 ```bash
 curl http://localhost:8080/healthz
@@ -51,6 +74,7 @@ curl http://localhost:8080/api/v1/examples
 
 - 优先接入 `github.com/eecopilot/userkit`，提供注册、登录、JWT 和 RBAC。
 - `github.com/eecopilot/oauth` 暂作为可选扩展，业务需要 OAuth2 授权服务器时再启用。
+- 新增业务模块见 [docs/add-module.md](docs/add-module.md)。
 
 ## 前端
 
@@ -71,20 +95,19 @@ web/
 
 默认 `USERKIT_ENABLED=false`，starter 不要求本地必须有数据库。
 
-开发时建议本地跑 app、Docker 跑 PostgreSQL。先启动数据库并执行迁移：
+开发时建议本地跑 app、Docker 跑 PostgreSQL。最短路径：
+
+```bash
+cp .env.example .env
+make dev-up
+```
+
+手动分步也可以：
 
 ```bash
 make docker-up
 make migrate-up
-```
-
-然后启用 `userkit` 启动 app：
-
-```bash
-USERKIT_ENABLED=true \
-USERKIT_DATABASE_URL='postgres://starter:starter@localhost:55432/starter?sslmode=disable' \
-USERKIT_JWT_SECRET='change-me-to-a-long-random-secret' \
-go run ./cmd/api
+make dev USERKIT_ENABLED=true
 ```
 
 启用后的主要路由挂载在 `/api/v1`：
@@ -125,6 +148,8 @@ curl http://localhost:8080/api/v1/protected/example \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
+新增业务模块的详细步骤见 [docs/add-module.md](docs/add-module.md)。
+
 ## Docker
 
 有两种 Docker 用法。
@@ -146,10 +171,7 @@ make migrate-up
 启用用户模块运行本地 app：
 
 ```bash
-USERKIT_ENABLED=true \
-USERKIT_DATABASE_URL='postgres://starter:starter@localhost:55432/starter?sslmode=disable' \
-USERKIT_JWT_SECRET='change-me-to-a-long-random-secret' \
-go run ./cmd/api
+make dev USERKIT_ENABLED=true
 ```
 
 ### 跑完整栈
@@ -212,11 +234,14 @@ make docker-build
 
 ```bash
 make dev
+make dev-up
+make dev-down
 make test
 make build
 make docker-build
 make docker-up
 make docker-app-up
 make migrate-up
+make smoke-local
 make smoke-docker
 ```

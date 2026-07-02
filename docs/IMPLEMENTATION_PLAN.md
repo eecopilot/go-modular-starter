@@ -47,6 +47,10 @@
 - `userkit` 迁移 SQL 复制到 starter `migrations/`。
 - 示例业务模块 `/api/v1/examples`。
 - 受保护业务示例 `/api/v1/protected/example`，演示 Bearer Token 校验和当前用户读取。
+- `make dev-up` / `make dev-down` / `make smoke-local`，支持一键本地开发链路。
+- Makefile 自动读取 `.env`，并通过 Docker migration 容器执行迁移。
+- `APP_ENV=production` 时拒绝默认 `USERKIT_JWT_SECRET`。
+- 新增 [add-module.md](add-module.md)，说明如何扩展业务模块。
 - Dockerfile 和完整 app + migration + PostgreSQL compose profile。
 - GitHub Actions CI：`go test ./...`、compose config、Docker build。
 
@@ -59,6 +63,7 @@
 - Docker 环境下 `userkit` 注册、登录、`/me` smoke test 通过。
 - Docker 环境下受保护业务示例 smoke test 通过。
 - Docker 环境下 example CRUD smoke test 通过。
+- 本地开发入口和生产配置安全校验有自动化测试或命令验证。
 
 ## 目标目录结构
 

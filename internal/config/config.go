@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const defaultDevelopmentJWTSecret = "change-me-to-a-long-random-secret"
+
 type LookupFunc func(string) (string, bool)
 
 type Config struct {
@@ -153,6 +155,9 @@ func (c Config) Validate() error {
 		if len(c.Userkit.JWTSecret) < 16 {
 			errs = append(errs, errors.New("USERKIT_JWT_SECRET must be at least 16 characters when USERKIT_ENABLED=true"))
 		}
+		if isProductionEnv(c.App.Env) && isDefaultJWTSecret(c.Userkit.JWTSecret) {
+			errs = append(errs, errors.New("USERKIT_JWT_SECRET must be changed in production"))
+		}
 		if c.Userkit.TokenTTL <= 0 {
 			errs = append(errs, errors.New("USERKIT_TOKEN_TTL must be positive"))
 		}
@@ -171,6 +176,19 @@ func (c Config) Validate() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func isProductionEnv(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "prod", "production":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDefaultJWTSecret(secret string) bool {
+	return strings.TrimSpace(secret) == defaultDevelopmentJWTSecret
 }
 
 func envString(lookup LookupFunc, key, fallback string) string {

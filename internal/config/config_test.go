@@ -48,6 +48,21 @@ func TestLoadFromLookupValidatesUserkitWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestLoadFromLookupRejectsDefaultJWTSecretInProduction(t *testing.T) {
+	_, err := LoadFromLookup(lookup(map[string]string{
+		"APP_ENV":              "production",
+		"USERKIT_ENABLED":      "true",
+		"USERKIT_DATABASE_URL": "postgres://user:pass@localhost/app",
+		"USERKIT_JWT_SECRET":   "change-me-to-a-long-random-secret",
+	}))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "USERKIT_JWT_SECRET must be changed in production") {
+		t.Fatalf("expected production JWT secret error, got %v", err)
+	}
+}
+
 func TestLoadFromLookupParsesValues(t *testing.T) {
 	cfg, err := LoadFromLookup(lookup(map[string]string{
 		"APP_NAME":                  "billing-api",

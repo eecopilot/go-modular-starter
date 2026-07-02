@@ -1,11 +1,30 @@
-.PHONY: dev test build run docker-up docker-app-up docker-down migrate-up docker-build smoke-docker
+.PHONY: dev dev-up dev-down test build run docker-up docker-app-up docker-down migrate-up docker-build smoke-local smoke-docker
 
 APP_NAME := go-modular-starter
 BUILD_DIR := bin
-DATABASE_URL ?= postgres://starter:starter@localhost:55432/starter?sslmode=disable
+COMPOSE := docker compose -f deployments/docker-compose.yml
+
+.EXPORT_ALL_VARIABLES:
+
+ifneq (,$(wildcard .env))
+include .env
+endif
+
+USERKIT_DATABASE_URL ?= postgres://starter:starter@localhost:55432/starter?sslmode=disable
+USERKIT_JWT_SECRET ?= change-me-to-a-long-random-secret
+DATABASE_URL ?= $(USERKIT_DATABASE_URL)
 
 dev:
 	go run ./cmd/api
+
+dev-up: export USERKIT_ENABLED := true
+dev-up: docker-up migrate-up
+	@printf '\napp: http://localhost:8080\n'
+	@printf 'health: curl http://localhost:8080/healthz\n'
+	@printf 'smoke: make smoke-local\n\n'
+	go run ./cmd/api
+
+dev-down: docker-down
 
 run:
 	go run ./cmd/api
@@ -21,19 +40,19 @@ docker-build:
 	docker build -f deployments/Dockerfile -t $(APP_NAME):local .
 
 docker-up:
-	docker compose -f deployments/docker-compose.yml up -d
+	$(COMPOSE) up -d postgres
 
 docker-app-up:
-	docker compose -f deployments/docker-compose.yml --profile app up -d --build
+	$(COMPOSE) --profile app up -d --build
 
 docker-down:
-	docker compose -f deployments/docker-compose.yml --profile app down
+	$(COMPOSE) --profile app down
 
 migrate-up:
-	@for file in migrations/*.sql; do \
-		echo "applying $$file"; \
-		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f "$$file"; \
-	done
+	$(COMPOSE) --profile app run --rm migrate
+
+smoke-local:
+	sh scripts/smoke-http.sh
 
 smoke-docker:
-	sh scripts/smoke-docker.sh
+	sh scripts/smoke-http.sh

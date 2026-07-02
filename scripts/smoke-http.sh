@@ -3,8 +3,8 @@ set -eu
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 stamp="$(date +%s)"
-email="smoke-${stamp}@example.com"
-username="smoke${stamp}"
+email="smoke-${stamp}-$$@example.com"
+username="smoke${stamp}$$"
 
 curl -fsS "${BASE_URL}/healthz" >/dev/null
 curl -fsS "${BASE_URL}/readyz" >/dev/null
@@ -37,4 +37,4 @@ curl -fsS -X POST "${BASE_URL}/api/v1/examples" \
 
 curl -fsS "${BASE_URL}/api/v1/examples" | grep -q '"Smoke item"'
 
-echo "docker smoke test passed"
+echo "http smoke test passed"
