@@ -30,6 +30,10 @@ func New(service *userkit.Service) *Module {
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	sub := http.NewServeMux()
 	m.handler.RegisterRoutes(sub)
+	// 子路由兜底：未知的 /api/v1/* 返回 JSON 404，和 webui 的 API 404 行为保持一致。
+	sub.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		httpserver.WriteError(w, http.StatusNotFound, "not_found", "route not found")
+	})
 
 	mux.Handle(Prefix+"/", http.StripPrefix(Prefix, sub))
 }

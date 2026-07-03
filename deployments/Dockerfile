@@ -1,4 +1,4 @@
-FROM golang:1.24 AS build
+FROM golang:1.25 AS build
 
 WORKDIR /src
 
@@ -9,7 +9,9 @@ COPY . .
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/api ./cmd/api
 
-FROM scratch
+# distroless static 自带 CA 证书和 tzdata；scratch 没有，
+# 一旦连 TLS 数据库（sslmode=require）或调用外部 HTTPS 会直接 x509 失败。
+FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=build /out/api /api
 

@@ -67,45 +67,50 @@ func LoadFromLookup(lookup LookupFunc) (Config, error) {
 	if lookup == nil {
 		lookup = os.LookupEnv
 	}
+	p := &envParser{lookup: lookup}
 
 	cfg := Config{
 		App: AppConfig{
-			Name:      envString(lookup, "APP_NAME", "go-modular-starter"),
-			Env:       envString(lookup, "APP_ENV", "development"),
-			Version:   envString(lookup, "APP_VERSION", "dev"),
-			Commit:    envString(lookup, "APP_COMMIT", "unknown"),
-			BuildTime: envString(lookup, "APP_BUILD_TIME", "unknown"),
+			Name:      p.str("APP_NAME", "go-modular-starter"),
+			Env:       p.str("APP_ENV", "development"),
+			Version:   p.str("APP_VERSION", "dev"),
+			Commit:    p.str("APP_COMMIT", "unknown"),
+			BuildTime: p.str("APP_BUILD_TIME", "unknown"),
 		},
 		HTTP: HTTPConfig{
-			Addr:               envString(lookup, "HTTP_ADDR", ":8080"),
-			ReadHeaderTimeout:  envDuration(lookup, "HTTP_READ_HEADER_TIMEOUT", 5*time.Second),
-			ReadTimeout:        envDuration(lookup, "HTTP_READ_TIMEOUT", 15*time.Second),
-			WriteTimeout:       envDuration(lookup, "HTTP_WRITE_TIMEOUT", 30*time.Second),
-			IdleTimeout:        envDuration(lookup, "HTTP_IDLE_TIMEOUT", 60*time.Second),
-			ShutdownTimeout:    envDuration(lookup, "HTTP_SHUTDOWN_TIMEOUT", 15*time.Second),
-			MaxHeaderBytes:     envInt(lookup, "HTTP_MAX_HEADER_BYTES", 1<<20),
-			BodyLimitBytes:     int64(envInt(lookup, "HTTP_BODY_LIMIT_BYTES", 1<<20)),
-			CORSAllowedOrigins: envCSV(lookup, "HTTP_CORS_ALLOWED_ORIGINS"),
+			Addr:               p.str("HTTP_ADDR", ":8080"),
+			ReadHeaderTimeout:  p.duration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second),
+			ReadTimeout:        p.duration("HTTP_READ_TIMEOUT", 15*time.Second),
+			WriteTimeout:       p.duration("HTTP_WRITE_TIMEOUT", 30*time.Second),
+			IdleTimeout:        p.duration("HTTP_IDLE_TIMEOUT", 60*time.Second),
+			ShutdownTimeout:    p.duration("HTTP_SHUTDOWN_TIMEOUT", 15*time.Second),
+			MaxHeaderBytes:     p.integer("HTTP_MAX_HEADER_BYTES", 1<<20),
+			BodyLimitBytes:     int64(p.integer("HTTP_BODY_LIMIT_BYTES", 1<<20)),
+			CORSAllowedOrigins: p.csv("HTTP_CORS_ALLOWED_ORIGINS"),
 		},
 		Log: LogConfig{
-			Level:  strings.ToLower(envString(lookup, "LOG_LEVEL", "info")),
-			Format: strings.ToLower(envString(lookup, "LOG_FORMAT", "text")),
+			Level:  strings.ToLower(p.str("LOG_LEVEL", "info")),
+			Format: strings.ToLower(p.str("LOG_FORMAT", "text")),
 		},
 		Userkit: UserkitConfig{
-			Enabled:           envBool(lookup, "USERKIT_ENABLED", false),
-			DatabaseURL:       envString(lookup, "USERKIT_DATABASE_URL", ""),
-			DBMaxOpenConns:    envInt(lookup, "USERKIT_DB_MAX_OPEN_CONNS", 10),
-			DBMaxIdleConns:    envInt(lookup, "USERKIT_DB_MAX_IDLE_CONNS", 5),
-			DBConnMaxLifetime: envDuration(lookup, "USERKIT_DB_CONN_MAX_LIFETIME", 30*time.Minute),
-			DBConnMaxIdleTime: envDuration(lookup, "USERKIT_DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
-			JWTSecret:         envString(lookup, "USERKIT_JWT_SECRET", ""),
-			JWTIssuer:         envString(lookup, "USERKIT_JWT_ISSUER", "go-modular-starter"),
-			JWTAudience:       envString(lookup, "USERKIT_JWT_AUDIENCE", "go-modular-starter-users"),
-			TokenTTL:          envDuration(lookup, "USERKIT_TOKEN_TTL", 24*time.Hour),
-			BCryptCost:        envInt(lookup, "USERKIT_BCRYPT_COST", 0),
+			Enabled:           p.boolean("USERKIT_ENABLED", false),
+			DatabaseURL:       p.str("USERKIT_DATABASE_URL", ""),
+			DBMaxOpenConns:    p.integer("USERKIT_DB_MAX_OPEN_CONNS", 10),
+			DBMaxIdleConns:    p.integer("USERKIT_DB_MAX_IDLE_CONNS", 5),
+			DBConnMaxLifetime: p.duration("USERKIT_DB_CONN_MAX_LIFETIME", 30*time.Minute),
+			DBConnMaxIdleTime: p.duration("USERKIT_DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
+			JWTSecret:         p.str("USERKIT_JWT_SECRET", ""),
+			JWTIssuer:         p.str("USERKIT_JWT_ISSUER", "go-modular-starter"),
+			JWTAudience:       p.str("USERKIT_JWT_AUDIENCE", "go-modular-starter-users"),
+			TokenTTL:          p.duration("USERKIT_TOKEN_TTL", 24*time.Hour),
+			BCryptCost:        p.integer("USERKIT_BCRYPT_COST", 0),
 		},
 	}
 
+	// 解析错误必须直接失败：静默回退默认值会掩盖 USERKIT_ENABLED=ture 这类手误。
+	if err := errors.Join(p.errs...); err != nil {
+		return Config{}, err
+	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -161,6 +166,10 @@ func (c Config) Validate() error {
 		if c.Userkit.TokenTTL <= 0 {
 			errs = append(errs, errors.New("USERKIT_TOKEN_TTL must be positive"))
 		}
+		// 0 表示交给 userkit 用 bcrypt.DefaultCost；显式设置时限定 bcrypt 合法区间。
+		if c.Userkit.BCryptCost != 0 && (c.Userkit.BCryptCost < 4 || c.Userkit.BCryptCost > 31) {
+			errs = append(errs, errors.New("USERKIT_BCRYPT_COST must be 0 (default) or between 4 and 31"))
+		}
 		if c.Userkit.DBMaxOpenConns <= 0 {
 			errs = append(errs, errors.New("USERKIT_DB_MAX_OPEN_CONNS must be positive"))
 		}
@@ -191,8 +200,13 @@ func isDefaultJWTSecret(secret string) bool {
 	return strings.TrimSpace(secret) == defaultDevelopmentJWTSecret
 }
 
-func envString(lookup LookupFunc, key, fallback string) string {
-	value, ok := lookup(key)
+type envParser struct {
+	lookup LookupFunc
+	errs   []error
+}
+
+func (p *envParser) str(key, fallback string) string {
+	value, ok := p.lookup(key)
 	if !ok {
 		return fallback
 	}
@@ -203,44 +217,47 @@ func envString(lookup LookupFunc, key, fallback string) string {
 	return value
 }
 
-func envDuration(lookup LookupFunc, key string, fallback time.Duration) time.Duration {
-	value, ok := lookup(key)
+func (p *envParser) duration(key string, fallback time.Duration) time.Duration {
+	value, ok := p.lookup(key)
 	if !ok || strings.TrimSpace(value) == "" {
 		return fallback
 	}
 	parsed, err := time.ParseDuration(strings.TrimSpace(value))
 	if err != nil {
-		return -1
+		p.errs = append(p.errs, fmt.Errorf("%s: invalid duration %q (example: 15s, 1m30s)", key, value))
+		return fallback
 	}
 	return parsed
 }
 
-func envInt(lookup LookupFunc, key string, fallback int) int {
-	value, ok := lookup(key)
+func (p *envParser) integer(key string, fallback int) int {
+	value, ok := p.lookup(key)
 	if !ok || strings.TrimSpace(value) == "" {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(strings.TrimSpace(value))
 	if err != nil {
-		return -1
+		p.errs = append(p.errs, fmt.Errorf("%s: invalid integer %q", key, value))
+		return fallback
 	}
 	return parsed
 }
 
-func envBool(lookup LookupFunc, key string, fallback bool) bool {
-	value, ok := lookup(key)
+func (p *envParser) boolean(key string, fallback bool) bool {
+	value, ok := p.lookup(key)
 	if !ok || strings.TrimSpace(value) == "" {
 		return fallback
 	}
 	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
 	if err != nil {
+		p.errs = append(p.errs, fmt.Errorf("%s: invalid boolean %q (use true or false)", key, value))
 		return fallback
 	}
 	return parsed
 }
 
-func envCSV(lookup LookupFunc, key string) []string {
-	value, ok := lookup(key)
+func (p *envParser) csv(key string) []string {
+	value, ok := p.lookup(key)
 	if !ok || strings.TrimSpace(value) == "" {
 		return nil
 	}

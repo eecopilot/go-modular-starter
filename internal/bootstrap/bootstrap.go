@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/eecopilot/go-modular-starter/internal/app"
 	"github.com/eecopilot/go-modular-starter/internal/config"
@@ -19,19 +20,25 @@ import (
 	userkitpostgres "github.com/eecopilot/userkit/postgres"
 )
 
-func New(cfg config.Config, log *slog.Logger) (*app.App, error) {
+// dbConnectTimeout 限定启动时首次连接数据库的等待时间，
+// 避免数据库不可达时进程无限挂起且无法被信号中断。
+const dbConnectTimeout = 10 * time.Second
+
+func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*app.App, error) {
 	mux := http.NewServeMux()
 	var closers []app.Closer
 	var readiness []health.NamedChecker
 
 	if cfg.Userkit.Enabled {
-		db, err := platformpostgres.Open(context.Background(), platformpostgres.Config{
+		connectCtx, cancel := context.WithTimeout(ctx, dbConnectTimeout)
+		db, err := platformpostgres.Open(connectCtx, platformpostgres.Config{
 			DatabaseURL:     cfg.Userkit.DatabaseURL,
 			MaxOpenConns:    cfg.Userkit.DBMaxOpenConns,
 			MaxIdleConns:    cfg.Userkit.DBMaxIdleConns,
 			ConnMaxLifetime: cfg.Userkit.DBConnMaxLifetime,
 			ConnMaxIdleTime: cfg.Userkit.DBConnMaxIdleTime,
 		})
+		cancel()
 		if err != nil {
 			return nil, err
 		}

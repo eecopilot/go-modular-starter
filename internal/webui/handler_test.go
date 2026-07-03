@@ -59,3 +59,42 @@ func TestHandlerFallsBackToIndexForSPARoutes(t *testing.T) {
 		t.Fatalf("unexpected body: %s", rr.Body.String())
 	}
 }
+
+func TestHandlerReturnsJSONNotFoundForAPIRoutes(t *testing.T) {
+	handler, err := New(web.Files)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	for _, target := range []string{"/api", "/api/", "/api/v1/unknown"} {
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, target, nil))
+
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("%s: expected 404, got %d", target, rr.Code)
+		}
+		if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+			t.Fatalf("%s: expected JSON response, got %q", target, ct)
+		}
+		if !strings.Contains(rr.Body.String(), "not_found") {
+			t.Fatalf("%s: unexpected body: %s", target, rr.Body.String())
+		}
+	}
+}
+
+func TestHandlerRejectsNonGetMethods(t *testing.T) {
+	handler, err := New(web.Files)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/dashboard/settings", nil))
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rr.Code)
+	}
+	if allow := rr.Header().Get("Allow"); allow != "GET, HEAD" {
+		t.Fatalf("expected Allow header, got %q", allow)
+	}
+}

@@ -93,3 +93,54 @@ func TestLoadFromLookupParsesValues(t *testing.T) {
 		t.Fatalf("unexpected token ttl: %s", cfg.Userkit.TokenTTL)
 	}
 }
+
+func TestLoadFromLookupReportsParseErrors(t *testing.T) {
+	cases := []struct {
+		name    string
+		env     map[string]string
+		wantErr string
+	}{
+		{
+			name:    "invalid duration",
+			env:     map[string]string{"HTTP_READ_TIMEOUT": "15sec"},
+			wantErr: `HTTP_READ_TIMEOUT: invalid duration "15sec"`,
+		},
+		{
+			name:    "invalid integer",
+			env:     map[string]string{"HTTP_MAX_HEADER_BYTES": "1MB"},
+			wantErr: `HTTP_MAX_HEADER_BYTES: invalid integer "1MB"`,
+		},
+		{
+			name:    "invalid boolean",
+			env:     map[string]string{"USERKIT_ENABLED": "ture"},
+			wantErr: `USERKIT_ENABLED: invalid boolean "ture"`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadFromLookup(lookup(tc.env))
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestLoadFromLookupRejectsOutOfRangeBCryptCost(t *testing.T) {
+	_, err := LoadFromLookup(lookup(map[string]string{
+		"USERKIT_ENABLED":      "true",
+		"USERKIT_DATABASE_URL": "postgres://user:pass@localhost/app",
+		"USERKIT_JWT_SECRET":   "0123456789abcdef",
+		"USERKIT_BCRYPT_COST":  "99",
+	}))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "USERKIT_BCRYPT_COST") {
+		t.Fatalf("expected bcrypt cost error, got %v", err)
+	}
+}

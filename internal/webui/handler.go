@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/eecopilot/go-modular-starter/internal/httpserver"
 )
 
 type Handler struct {
@@ -24,6 +26,17 @@ func New(files fs.FS) (*Handler, error) {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// API 路由不匹配时必须返回 JSON 404，绝不能回退到 SPA index。
+	if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+		httpserver.WriteError(w, http.StatusNotFound, "not_found", "route not found")
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		httpserver.WriteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "only GET and HEAD are allowed")
+		return
+	}
+
 	cleanPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 	if cleanPath == "." || cleanPath == "" {
 		h.serveIndex(w)

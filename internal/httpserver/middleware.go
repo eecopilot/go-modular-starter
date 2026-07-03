@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,6 +41,12 @@ func (r *statusRecorder) Write(data []byte) (int, error) {
 	n, err := r.ResponseWriter.Write(data)
 	r.bytes += n
 	return n, err
+}
+
+// Unwrap 让 http.NewResponseController 能穿透包装，拿到底层的 Flusher/Hijacker
+// 等能力（SSE、WebSocket、反向代理都依赖这一点）。
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
 
 func RequestID(ctx context.Context) string {
@@ -81,11 +89,16 @@ func Recoverer(log *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if recovered := recover(); recovered != nil {
+					// http.ErrAbortHandler 是标准库约定的"主动中断"信号，必须继续向上抛。
+					if err, ok := recovered.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+						panic(recovered)
+					}
 					log.Error("panic recovered",
 						"request_id", RequestID(r.Context()),
 						"method", r.Method,
 						"path", r.URL.Path,
 						"panic", recovered,
+						"stack", string(debug.Stack()),
 					)
 					WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 				}
@@ -107,18 +120,30 @@ func SecurityHeaders(next http.Handler) http.Handler {
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 无论 origin 是否命中都要声明 Vary，
+			// 否则缓存可能把带/不带 CORS 头的响应错发给其他 origin。
+			w.Header().Add("Vary", "Origin")
+
 			origin := r.Header.Get("Origin")
-			if origin != "" && originAllowed(origin, allowedOrigins) {
+			allowed := origin != "" && originAllowed(origin, allowedOrigins)
+			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Vary", "Origin")
-				w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-ID")
-				w.Header().Set("Access-Control-Max-Age", "600")
 			}
-			if r.Method == http.MethodOptions {
+
+			// 只有带 Origin 和 Access-Control-Request-Method 的 OPTIONS 才是 CORS 预检，
+			// 其余 OPTIONS 请求照常交给业务路由处理。
+			if r.Method == http.MethodOptions && origin != "" && r.Header.Get("Access-Control-Request-Method") != "" {
+				w.Header().Add("Vary", "Access-Control-Request-Method")
+				w.Header().Add("Vary", "Access-Control-Request-Headers")
+				if allowed {
+					w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+					w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-ID")
+					w.Header().Set("Access-Control-Max-Age", "600")
+				}
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
+
 			next.ServeHTTP(w, r)
 		})
 	}
