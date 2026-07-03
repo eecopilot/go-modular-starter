@@ -5,3 +5,4 @@ bin/
 coverage.out
 tmp/
 /api
+web/app/

@@ -1,4 +1,4 @@
-.PHONY: dev dev-up dev-down test build run docker-up docker-app-up docker-down migrate-up docker-build smoke-local smoke-docker
+.PHONY: dev dev-up dev-down frontend-import frontend-build test build run docker-up docker-app-up docker-down migrate-up docker-build smoke-local smoke-docker
 
 APP_NAME := go-modular-starter
 BUILD_DIR := bin
@@ -25,6 +25,14 @@ dev-up: docker-up migrate-up
 	go run ./cmd/api
 
 dev-down: docker-down
+
+frontend-import:
+	sh scripts/frontend-import.sh
+
+frontend-build: export FRONTEND_GIT_URL :=
+frontend-build: export FRONTEND_GIT_REF :=
+frontend-build:
+	sh scripts/frontend-import.sh
 
 run:
 	go run ./cmd/api

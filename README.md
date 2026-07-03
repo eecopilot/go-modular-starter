@@ -85,18 +85,38 @@ curl http://localhost:8080/api/v1/examples
 
 ## 前端
 
-当前前端只放 starter shell，不写业务页面。
+当前仓库默认只放 starter shell，但已经支持把任意可静态构建的开源前端作为子项目接进来。
 
 ```text
 web/
+├── app/           # 可选：外部前端子项目，默认不提交到 starter 仓库
 ├── embed.go       # go:embed 入口
-├── dist/          # 当前被嵌入和服务的静态资源
+├── dist/          # 当前被嵌入和服务的静态资源，导入前端后会被替换
 └── README.md
 ```
 
 后端启动后会把 `web/dist` 嵌入到 Go 二进制，并从 `/` 服务。API 路由仍然走 `/api/v1/...`、`/healthz`、`/readyz`、`/version`。
 
-如果以后前端变成完整 SPA，可以加 `web/src` 和 Vite/React/Vue 等构建工具，仍然输出到 `web/dist`，继续由 Go 侧 `go:embed` 打包。
+接入外部前端的最短路径：
+
+```bash
+cp .env.example .env
+# 编辑 .env，通常只需要填 FRONTEND_GIT_URL / FRONTEND_GIT_REF
+make frontend-import
+make dev
+```
+
+常见配置：
+
+```env
+FRONTEND_GIT_URL=https://github.com/example/frontend.git
+FRONTEND_GIT_REF=main
+FRONTEND_APP_DIR=web/app
+FRONTEND_DIST_DIR=
+FRONTEND_OUTPUT_DIR=web/dist
+```
+
+`make frontend-import` 会克隆前端项目、安装依赖、运行构建，自动查找 `dist`、`build`、`out`、`.output/public` 这类常见产物目录，并把构建产物同步到 `web/dist`。如果某个项目输出目录特殊，再手动设置 `FRONTEND_DIST_DIR`。前端项目需要能输出包含 `index.html` 的静态目录；Vite/React/Vue 这类 SPA 通常可以直接用，Next.js/Nuxt/SvelteKit 这类项目需要先配置静态导出。前端调用后端 API 时建议使用同源路径 `/api/v1`。
 
 <details>
 <summary><strong>Userkit</strong></summary>

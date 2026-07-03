@@ -5,3 +5,9 @@ bin/
 /dist/
 tmp/
 coverage.out
+web/app/.git/
+web/app/node_modules/
+web/app/dist/
+web/app/build/
+web/app/.next/
+web/app/.nuxt/
